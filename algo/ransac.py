@@ -1,49 +1,7 @@
 import torch
 import open3d as o3d
 import numpy as np
-
-
-def to_o3d_pcd(xyz):
-    """
-    Convert tensor/array to open3d PointCloud
-    xyz:       [N, 3]
-    """
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(to_array(xyz))
-    return pcd
-
-
-def to_o3d_feats(embedding):
-    """
-    Convert tensor/array to open3d features
-    embedding:  [N, 3]
-    """
-    feats = o3d.registration.Feature()
-    feats.data = to_array(embedding).T
-    return feats
-
-
-def to_tensor(array):
-    """
-    Convert array to tensor
-    """
-    if (not isinstance(array, torch.Tensor)):
-        return torch.from_numpy(array).float()
-    else:
-        return array
-
-
-def to_array(tensor):
-    """
-    Conver tensor to array
-    """
-    if (not isinstance(tensor, np.ndarray)):
-        if (tensor.device == torch.device('cpu')):
-            return tensor.numpy()
-        else:
-            return tensor.cpu().numpy()
-    else:
-        return tensor
+from utils.data_utils import to_tensor, to_array, to_o3d_feats, to_o3d_pcd
 
 
 def mutual_selection(score_mat):

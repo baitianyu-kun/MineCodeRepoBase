@@ -3,10 +3,51 @@ import torch.nn as nn
 import math
 
 
+def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Tensor = None):
+    """Compute rigid transforms between two point sets
+    Args:
+        a (torch.Tensor): ([*,] N, 3) points
+        b (torch.Tensor): ([*,] N, 3) points
+        weights (torch.Tensor): ([*, ] N)
+    Returns:
+        Transform T ([*,] 3, 4) to get from a to b, i.e. T*a = b
+    """
+    assert a.shape == b.shape
+    assert a.shape[-1] == 3
+    if weights is not None:
+        assert a.shape[:-1] == weights.shape
+        assert weights.min() >= 0 and weights.max() <= 1
+        weights_normalized = weights[..., None] / \
+                             torch.clamp_min(torch.sum(weights, dim=-1, keepdim=True)[..., None], _EPS)
+        centroid_a = torch.sum(a * weights_normalized, dim=-2)
+        centroid_b = torch.sum(b * weights_normalized, dim=-2)
+        a_centered = a - centroid_a[..., None, :]
+        b_centered = b - centroid_b[..., None, :]
+        cov = a_centered.transpose(-2, -1) @ (b_centered * weights_normalized)
+    else:
+        centroid_a = torch.mean(a, dim=-2)
+        centroid_b = torch.mean(b, dim=-2)
+        a_centered = a - centroid_a[..., None, :]
+        b_centered = b - centroid_b[..., None, :]
+        cov = a_centered.transpose(-2, -1) @ b_centered
+    # Compute rotation using Kabsch algorithm. Will compute two copies with +/-V[:,:3]
+    # and choose based on determinant to avoid flips
+    u, s, v = torch.svd(cov, some=False, compute_uv=True)
+    rot_mat_pos = v @ u.transpose(-1, -2)
+    v_neg = v.clone()
+    v_neg[..., 2] *= -1
+    rot_mat_neg = v_neg @ u.transpose(-1, -2)
+    rot_mat = torch.where(torch.det(rot_mat_pos)[..., None, None] > 0, rot_mat_pos, rot_mat_neg)
+    # Compute translation (uncenter centroid)
+    translation = -rot_mat @ centroid_a[..., :, None] + centroid_b[..., :, None]
+    transform = torch.cat((rot_mat, translation), dim=-1)
+    transform=torch.eye()
+    return transform
+
+
 class SVDHead(nn.Module):
-    def __init__(self, emb_dims, input_shape="bnc"):
+    def __init__(self, input_shape="bnc"):
         super(SVDHead, self).__init__()
-        self.emb_dims = emb_dims
         self.reflect = nn.Parameter(torch.eye(3), requires_grad=False)
         self.reflect[2, 2] = -1
         self.input_shape = input_shape

@@ -2,6 +2,50 @@ import numpy as np
 import torch
 from scipy.spatial.distance import minkowski
 from sklearn.neighbors import NearestNeighbors
+import open3d as o3d
+
+
+def to_o3d_pcd(xyz):
+    """
+    Convert tensor/array to open3d PointCloud
+    xyz:       [N, 3]
+    """
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(to_array(xyz))
+    return pcd
+
+
+def to_o3d_feats(embedding):
+    """
+    Convert tensor/array to open3d features
+    embedding:  [N, 3]
+    """
+    feats = o3d.registration.Feature()
+    feats.data = to_array(embedding).T
+    return feats
+
+
+def to_tensor(array):
+    """
+    Convert array to tensor
+    """
+    if (not isinstance(array, torch.Tensor)):
+        return torch.from_numpy(array).float()
+    else:
+        return array
+
+
+def to_array(tensor):
+    """
+    Conver tensor to array
+    """
+    if (not isinstance(tensor, np.ndarray)):
+        if (tensor.device == torch.device('cpu')):
+            return tensor.numpy()
+        else:
+            return tensor.cpu().numpy()
+    else:
+        return tensor
 
 
 def uniform_2_sphere(num: int = None):
