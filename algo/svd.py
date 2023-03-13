@@ -2,15 +2,17 @@ import torch
 import torch.nn as nn
 import math
 
+_EPS = 1e-6
+
 
 def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Tensor = None):
-    """Compute rigid transforms between two point sets
+    """ Compute rigid transforms between two point sets
     Args:
         a (torch.Tensor): ([*,] N, 3) points
         b (torch.Tensor): ([*,] N, 3) points
         weights (torch.Tensor): ([*, ] N)
     Returns:
-        Transform T ([*,] 3, 4) to get from a to b, i.e. T*a = b
+        Transform T ([*,] 4, 4) to get from a to b, i.e. T*a = b
     """
     assert a.shape == b.shape
     assert a.shape[-1] == 3
@@ -41,7 +43,11 @@ def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Ten
     # Compute translation (uncenter centroid)
     translation = -rot_mat @ centroid_a[..., :, None] + centroid_b[..., :, None]
     transform = torch.cat((rot_mat, translation), dim=-1)
-    transform=torch.eye()
+    # CHANGED T ([*,] 3, 4) -> T ([*,] 4, 4)
+    temp = torch.zeros_like(torch.empty(transform.shape[0], 4, 4))
+    temp[:, :3, :4] = transform
+    temp[:, 3, 3] = 1
+    transform = temp
     return transform
 
 
