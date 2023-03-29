@@ -244,6 +244,32 @@ def transform(g, a):
     return b
 
 
+def transform_np(g: np.ndarray, pts: np.ndarray):
+    """ Use g to transform a numpy version
+    Args:
+        g: SO3 transformation matrix of size ([B,] 3, 3)
+        pts: Points to be transformed ([B,] N, 3)
+    Returns:
+        transformed points of size (N, 3)
+    """
+    rot = g[..., :3, :3]  # (3, 3)
+    transformed = pts[..., :3] @ np.swapaxes(rot, -1, -2)
+    return transformed
+
+
+def transform_torch(g: torch.Tensor, pts: torch.Tensor):
+    """ Use g to transform a torch version
+    Args:
+        g: SO3 transformation matrix of size ([B,] 3, 3)
+        pts: Points to be transformed ([B,] N, 3)
+    Returns:
+        transformed points of size (N, 3)
+    """
+    rot = g[..., :3, :3]  # (3, 3)
+    transformed = pts[..., :3] @ torch.swapaxes(rot, -1, -2)
+    return transformed
+
+
 def group_prod(g, h):
     # g, h : SO(3)
     g1 = g.matmul(h)
