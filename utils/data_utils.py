@@ -1,7 +1,8 @@
+import math
 import numpy as np
 import torch
 from scipy.spatial.distance import minkowski
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import NearestNeighbors, KDTree
 import open3d as o3d
 
 
@@ -71,8 +72,126 @@ def uniform_2_sphere(num: int = None):
 
 
 def jitter_pcd(pcd, sigma=0.01, clip=0.05):
+    """ add noise to pcd
+    Args:
+        pcd:
+        sigma:
+        clip:
+    Returns:
+    """
     pcd += np.clip(sigma * np.random.randn(*pcd.shape), -1 * clip, clip)
     return pcd
+
+
+def make_patches(points, normals, k):
+    """ Make points patches
+    Args:
+        points: pcds
+        normals: pcds normals
+        k: the k number of patches
+    Returns: centers, centers_normals, patches, patches_normals, centers_idx
+    """
+    centers_idx = np.random.choice(len(points), size=len(points), replace=False)
+    centers = points[centers_idx]
+    kd_tree = KDTree(points)
+    indexes = kd_tree.query(centers, k=k, return_distance=False)
+    patches = points[indexes]
+    centers_normals = normals[centers_idx]
+    patches_normals = normals[indexes]
+    return centers, centers_normals, patches, patches_normals, centers_idx
+
+
+def add_outliers(pointcloud, gt_mask):
+    """ Add outlier to pcds
+    Args:
+        pointcloud:
+        gt_mask:
+    Returns:
+    """
+    if isinstance(pointcloud, np.ndarray):
+        pointcloud = torch.from_numpy(pointcloud)
+
+    num_outliers = 20
+    N, C = pointcloud.shape
+    outliers = 2 * torch.rand(num_outliers, C) - 1  # Sample points in a cube [-0.5, 0.5]
+    pointcloud = torch.cat([pointcloud, outliers], dim=0)
+    gt_mask = torch.cat([gt_mask, torch.zeros(num_outliers)])
+
+    idx = torch.randperm(pointcloud.shape[0])
+    pointcloud, gt_mask = pointcloud[idx], gt_mask[idx]
+    return pointcloud.numpy(), gt_mask
+
+
+def compute_normal(pointcloud, radius=0.03, max_nn=30):
+    """ Compute pcd normals
+    Args:
+        pointcloud:
+        radius: 搜索半径
+        max_nn: 邻域内用于估算法线的最大点数
+    Returns:
+    """
+    pcd_ = o3d.geometry.PointCloud()
+    pcd_.points = o3d.utility.Vector3dVector(pointcloud)
+    pcd_.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius, max_nn))
+    normals = np.asarray(pcd_.normals)
+    return normals.astype('float32')
+
+
+def compute_ppf(centers, centers_normals, patches, patches_normals):
+    centers = centers[:, np.newaxis, :]
+    centers_normals = centers_normals[:, np.newaxis, :]
+    delta = patches - centers
+    dist = np.linalg.norm(delta, axis=-1)
+    angle_0 = angle(centers_normals, delta)
+    angle_1 = angle(patches_normals, delta)
+    angle_2 = angle(centers_normals, patches_normals)
+    ppf = np.stack((dist, angle_0, angle_1, angle_2), axis=-1)
+    features = np.concatenate((delta, patches_normals, ppf), axis=-1)
+    return features
+
+
+def angle(u, v):
+    """ Compute angle between 2 vectors
+    For robustness, we use the same formulation as in PPFNet, i.e.
+        angle(v1, v2) = atan2(cross(v1, v2), dot(v1, v2)).
+    This handles the case where one of the vectors is 0.0, since torch.atan2(0.0, 0.0)=0.0
+    Args:
+        u:
+        v:
+    Returns:
+    """
+    cross = np.linalg.norm(np.cross(u, v), axis=-1)
+    dot = np.sum(u * v, axis=-1)
+    return np.arctan2(cross, dot)
+
+
+def angle_torch(v1, v2):
+    """ Compute angle between 2 vectors
+    For robustness, we use the same formulation as in PPFNet, i.e.
+        angle(v1, v2) = atan2(cross(v1, v2), dot(v1, v2)).
+    This handles the case where one of the vectors is 0.0, since torch.atan2(0.0, 0.0)=0.0
+    Args:
+        v1: (B, *, 3)
+        v2: (B, *, 3)
+    Returns:
+    """
+    cross_prod = torch.stack([v1[..., 1] * v2[..., 2] - v1[..., 2] * v2[..., 1],
+                              v1[..., 2] * v2[..., 0] - v1[..., 0] * v2[..., 2],
+                              v1[..., 0] * v2[..., 1] - v1[..., 1] * v2[..., 0]], dim=-1)
+    cross_prod_norm = torch.norm(cross_prod, dim=-1)
+    dot_prod = torch.sum(v1 * v2, dim=-1)
+    return torch.atan2(cross_prod_norm, dot_prod)
+
+
+def make_patches(points, normals, k):
+    centers_idx = np.random.choice(len(points), size=len(points), replace=False)
+    centers = points[centers_idx]
+    kd_tree = KDTree(points)
+    indexes = kd_tree.query(centers, k=k, return_distance=False)
+    patches = points[indexes]
+    centers_normals = normals[centers_idx]
+    patches_normals = normals[indexes]
+    return centers, centers_normals, patches, patches_normals, centers_idx
 
 
 def random_pose(max_angle, max_trans):
@@ -94,11 +213,55 @@ def random_rotation(max_angle):
     return R
 
 
+def rotation_x_matrix(theta):
+    mat = np.eye(3, dtype=np.float32)
+    mat[1, 1] = math.cos(theta)
+    mat[1, 2] = -math.sin(theta)
+    mat[2, 1] = math.sin(theta)
+    mat[2, 2] = math.cos(theta)
+    return mat
+
+
+def rotation_y_matrix(theta):
+    mat = np.eye(3, dtype=np.float32)
+    mat[0, 0] = math.cos(theta)
+    mat[0, 2] = math.sin(theta)
+    mat[2, 0] = -math.sin(theta)
+    mat[2, 2] = math.cos(theta)
+    return mat
+
+
+def rotation_z_matrix(theta):
+    mat = np.eye(3, dtype=np.float32)
+    mat[0, 0] = math.cos(theta)
+    mat[0, 1] = -math.sin(theta)
+    mat[1, 0] = math.sin(theta)
+    mat[1, 1] = math.cos(theta)
+    return mat
+
+
 def random_translation(max_dist):
     t = np.random.randn(3)
     t /= np.linalg.norm(t)
     t *= np.random.rand() * max_dist
     return np.expand_dims(t, 1)
+
+
+def random_select_points(pc, m):
+    """ Random select points from pcd
+    Args:
+        pc: pcd points
+        m:  num sampled
+    Returns: sampled pcd points
+    """
+    if m < 0:
+        idx = np.arange(pc.shape[0])
+        np.random.shuffle(idx)
+        return pc[idx, :]
+    n = pc.shape[0]
+    replace = False if n >= m else True
+    idx = np.random.choice(n, size=(m,), replace=replace)
+    return pc[idx, :]
 
 
 def farthest_neighbour_subsample_points(pointcloud1, pointcloud2, num_subsampled_points=768):
