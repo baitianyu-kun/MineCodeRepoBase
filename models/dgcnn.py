@@ -62,6 +62,7 @@ class DGCNN(torch.nn.Module):
             raise RuntimeError("shape of x must be of [Batch x 3 x NumInPoints]")
 
         batch_size, num_dims, num_points = input_data.size()
+        # output : (batch, channel, num_pts, neighbours)
         output = get_graph_feature(input_data)
 
         output = F.relu(self.bn1(self.conv1(output)))

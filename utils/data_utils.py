@@ -183,17 +183,6 @@ def angle_torch(v1, v2):
     return torch.atan2(cross_prod_norm, dot_prod)
 
 
-def make_patches(points, normals, k):
-    centers_idx = np.random.choice(len(points), size=len(points), replace=False)
-    centers = points[centers_idx]
-    kd_tree = KDTree(points)
-    indexes = kd_tree.query(centers, k=k, return_distance=False)
-    patches = points[indexes]
-    centers_normals = normals[centers_idx]
-    patches_normals = normals[indexes]
-    return centers, centers_normals, patches, patches_normals, centers_idx
-
-
 def random_pose(max_angle, max_trans):
     R = random_rotation(max_angle)
     t = random_translation(max_trans)
