@@ -21,7 +21,8 @@ idx = knn(data_batch2, knn_k)
 edge_list = idx
 batches, num_nodes, _ = edge_list.shape
 adj = np.zeros((batches, num_nodes, num_nodes))
+print(edge_list)
 for batch in range(batches):
     for i in range(num_nodes):
         adj[batch][i][edge_list[batch][i]] = 1
-
+print(adj)
