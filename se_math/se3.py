@@ -39,6 +39,45 @@ def concatenate(a, b, device):
     return concatenated
 
 
+def decompose_trans(trans):
+    """ Decompose SE3 transformations into R and t, support torch.Tensor and np.ndarry.
+    Input
+        - trans: [4, 4] or [bs, 4, 4], SE3 transformation matrix
+    Output
+        - R: [3, 3] or [bs, 3, 3], rotation matrix
+        - t: [3, 1] or [bs, 3, 1], translation matrix
+    """
+    if len(trans.shape) == 3:
+        return trans[:, :3, :3], trans[:, :3, 3:4]
+    else:
+        return trans[:3, :3], trans[:3, 3:4]
+
+
+def integrate_trans(R, t):
+    """ Integrate SE3 transformations from R and t, support torch.Tensor and np.ndarry.
+    Input
+        - R: [3, 3] or [bs, 3, 3], rotation matrix
+        - t: [3, 1] or [bs, 3, 1], translation matrix
+    Output
+        - trans: [4, 4] or [bs, 4, 4], SE3 transformation matrix
+    """
+    if len(R.shape) == 3:
+        if isinstance(R, torch.Tensor):
+            trans = torch.eye(4)[None].repeat(R.shape[0], 1, 1).to(R.device)
+        else:
+            trans = np.eye(4)[None]
+        trans[:, :3, :3] = R
+        trans[:, :3, 3:4] = t.view([-1, 3, 1])
+    else:
+        if isinstance(R, torch.Tensor):
+            trans = torch.eye(4).to(R.device)
+        else:
+            trans = np.eye(4)
+        trans[:3, :3] = R
+        trans[:3, 3:4] = t
+    return trans
+
+
 def twist_prod(x, y):
     x_ = x.view(-1, 6)
     y_ = y.view(-1, 6)

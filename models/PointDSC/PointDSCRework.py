@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import se_math.se3 as se3
 
 
 class NonlocalSingleBlock(nn.Module):
@@ -63,12 +64,21 @@ class NonLocalNetwork(nn.Module):
 
 
 class PointDSCRework(nn.Module):
-    def __init__(self, sigma_d=0.1, in_dim=6, num_layers=6, num_channels=128):
+    def __init__(self,
+                 sigma_d=0.1,
+                 in_dim=6,
+                 num_layers=6,
+                 num_channels=128,
+                 seed_ratio=0.1,
+                 num_iterations=10,
+                 inlier_threshold=0.5,
+                 k=40):
         super(PointDSCRework, self).__init__()
-        self.seed_ratio = 0.1
-        self.num_iterations = 10
+        self.seed_ratio = seed_ratio
+        self.num_iterations = num_iterations
+        self.inlier_threshold = inlier_threshold
         # the k points around seeds
-        self.k = 40
+        self.k = k
         self.sigma = nn.Parameter(torch.Tensor([1.0]).float(), requires_grad=True)
         self.sigma_spat = nn.Parameter(torch.Tensor([sigma_d]).float(), requires_grad=False)
         self.feature_encoder = NonLocalNetwork(in_dim, num_layers, num_channels)
@@ -81,10 +91,13 @@ class PointDSCRework(nn.Module):
         )
 
     def forward(self, cors_pos, src_keypts, tgt_keypts):
+        # src_keypts, tgt_keypts: torch.Size([2, 10, 3]) -> (batch, num_pts, 3)
         batch_size, num_cors, _ = cors_pos.shape
 
         # 1. extract feature for each correspondence and calculate M
         # line_distance_src_tgt: torch.Size([2, 10, 10]) -> (bs, num_cors, num_cors)
+        # src_keypts[:, :, None, :]: torch.Size([2, 10, 1, 3])
+        # src_keypts[:, None, :, :]: torch.Size([2, 1, 10, 3])
         line_distance_src_tgt = (torch.norm((src_keypts[:, :, None, :] - src_keypts[:, None, :, :]), dim=-1)) \
                                 - (torch.norm((tgt_keypts[:, :, None, :] - tgt_keypts[:, None, :, :]), dim=-1))
         # beta_attention: torch.Size([2, 10, 10])
@@ -99,13 +112,86 @@ class PointDSCRework(nn.Module):
         M[:, torch.arange(M.shape[1]), torch.arange(M.shape[1])] = 0
         # ====calculate cors_feature_normed similarity matrix====
 
-        # 2. estimate initial confidence by MLP, find highly confident and well-distributed points as seeds.
-        # seed_confidence: torch.Size([2, 1, 10]) -> torch.Size([2, 10])
-        seed_confidence = self.seed_confidence(cors_feature.transpose(1, 2)).squeeze(1)
+        # 2. estimate all cors initial confidence by MLP, find highly confident and well-distributed points as seeds.
+        # seed_confidence: torch.Size([2, 1, 10]) -> torch.Size([2, 10]): (batch, num_cors)
+        all_cors_init_confidence = self.seed_confidence(cors_feature.transpose(1, 2)).squeeze(1)
         # find the most big k seeds' idx use argsort
-        seed_idx = torch.argsort(seed_confidence, dim=1, descending=True)[:, 0:int(num_cors * self.seed_ratio)]
+        seed_idx = torch.argsort(all_cors_init_confidence, dim=1, descending=True)[:, 0:int(num_cors * self.seed_ratio)]
+
+        # 3. estimate each transformation by each seed
         seedwise_trans = self.calculate_seeds_transform(seed_idx, cors_feature_normed, src_keypts, tgt_keypts)
-        # TODO CALCULATE INLIER NUMBER FOR EACH HYPOTHESIS
+
+        # 4. hypothesis every transformation and get the best one per batch
+        # seedwise_trans: torch.Size([2, 1, 4, 4]) -> (batch, seeds, 4, 4)
+        # src_keypts: torch.Size([2, 10, 3])
+        final_trans, final_labels = self.calculate_inlier_number_each_hypothesis(seedwise_trans, src_keypts, tgt_keypts)
+        # in paper, all_cors_init_confidence and gt labels both go to the BCE Loss
+        # but in the officical code:
+        # during training, return the all_cors_init_confidence as logits for classification loss
+        # during testing, return the final_labels given by final transformation.
+        # so we return them both
+        return final_trans, final_labels, all_cors_init_confidence, M
+
+    def calculate_inlier_number_each_hypothesis(self, seedwise_trans, src_keypts, tgt_keypts):
+        batch, num_seeds, _, _ = seedwise_trans.shape
+        batch, num_pts, _ = src_keypts.shape
+
+        # ====first method to calculate pred_position====
+        # seedwise_trans[:, :, :3, :3] (2, 1, 3, 3) -> (batch, seeds, n, m)
+        # src_keypts.permute(0, 2, 1) (2, 3, 10) -> (batch, m, k)
+        # pred_position (batch, seeds, n, k)
+        pred_position = torch.einsum('bsnm,bmk->bsnk',
+                                     seedwise_trans[:, :, :3, :3],
+                                     src_keypts.permute(0, 2, 1)) \
+                        + seedwise_trans[:, :, :3, 3:4]  # [bs, num_seeds, num_corr, 3]
+        pred_position = pred_position.permute(0, 1, 3, 2)
+        # ====first method to calculate pred_position====
+
+        # ====second method to calculate pred_position====
+        # src_keypts[:, None, :, :].expand(batch, num_seeds, num_pts, 3) -> (batch, seeds, num_pts, 3)
+        # 实际上就是把src_keypts复制到每个seed一份,这样每个seed乘到的都是一样的src_keypts
+        # 还有就是@后把R给转置,然后trans需要在最后一个维度之前复制出来一个1维度用来进行广播相加
+        # seedwise_trans[:, :, :3,:3] -> (batch, seeds, 3, 3)
+        # seedwise_trans[:,:,:3,3] -> (batch, seeds, 3)
+        # seedwise_trans[:,:,:3,3][:,:,None,:] -> (batch, seeds, 1, 3)
+        temp = src_keypts[:, None, :, :].expand(batch, num_seeds, num_pts, 3) \
+               @ torch.swapaxes(seedwise_trans[:, :, :3, :3], -1, -2) + seedwise_trans[:, :, :3, 3][:, :, None, :]
+        # ====second method to calculate pred_position====
+
+        # L2_dist: (batch, num_seeds, num_pts) Fig 5
+        L2_dist = torch.norm(pred_position - tgt_keypts[:, None, :, :], dim=-1)
+        # seedwise_fitness: (batch, num_seeds)
+        seedwise_fitness = torch.mean((L2_dist < self.inlier_threshold).float(), dim=-1)
+        # find the best L2 dist between pred and tgt -> best seed
+        # batch_best_guess_index: (batch) -> 每个batch中选一个best seed
+        batch_best_guess_index = seedwise_fitness.argmax(dim=1)
+
+        # make batch_best_guess_index into -> (batch, 1, 4, 4) -> (2, 1, 4, 4) 第二个seed维度只有一个,best seed
+        # seedwise_trans: (2, 1, 4, 4) 第二个维度是seed数量,可以是多个
+        # final_trans: (2, 1, 4, 4) 只找best seed,必须只有一个,所以需要把这个维度消掉,只留下(batch, 4, 4)
+        # 即每个batch找一个best seed
+        # 再squeeze -> final_trans: (batch, 4, 4)
+        final_trans = torch.gather(seedwise_trans, dim=1,
+                                   index=batch_best_guess_index[:, None, None, None]
+                                   .expand(-1, -1, 4, 4)).squeeze(1)
+
+        # 每个batch选一个最好seed的L2_dist (2, 2(seed num), 20) -> (2, 20)
+        final_labels = torch.gather(L2_dist, dim=1,
+                                    index=batch_best_guess_index[:, None, None]
+                                    .expand(-1, -1, num_pts)).squeeze(1)
+        # gtlabels = (distance < self.inlier_threshold).astype(np.int)
+        # Eq 7 loss
+        # 构建Fig5的图,用每个距离权重L2_dist来约束,自己和自己不建立距离(diag = 0)
+        final_labels = (final_labels < self.inlier_threshold).float()
+
+        # ====calculate pred_labels====
+        # pred_labels=np.array(final_labels.detach().cpu().numpy()>0,dtype=np.uint8)
+        # tensor([[0., 0., 0.,  ..., 0., 0., 1.],
+        #         [1., 0., 0.,  ..., 0., 0., 1.]])
+        # pred_labels=(final_labels>0).float()
+        # ====calculate pred_labels====
+
+        return final_trans, final_labels
 
     def calculate_seeds_transform(self, seed_idx, cors_feature, src_keypts, tgt_keypts):
         # the cors_feature has to be normalized
@@ -264,32 +350,7 @@ class PointDSCRework(nn.Module):
         t = centroid_B.permute(0, 2, 1) - R @ centroid_A.permute(0, 2, 1)
         # warp_A = transform(A, integrate_trans(R,t))
         # RMSE = torch.sum( (warp_A - B) ** 2, dim=-1).mean()
-        return self.integrate_trans(R, t)
-
-    def integrate_trans(self, R, t):
-        """
-        Integrate SE3 transformations from R and t, support torch.Tensor and np.ndarry.
-        Input
-            - R: [3, 3] or [bs, 3, 3], rotation matrix
-            - t: [3, 1] or [bs, 3, 1], translation matrix
-        Output
-            - trans: [4, 4] or [bs, 4, 4], SE3 transformation matrix
-        """
-        if len(R.shape) == 3:
-            if isinstance(R, torch.Tensor):
-                trans = torch.eye(4)[None].repeat(R.shape[0], 1, 1).to(R.device)
-            else:
-                trans = np.eye(4)[None]
-            trans[:, :3, :3] = R
-            trans[:, :3, 3:4] = t.view([-1, 3, 1])
-        else:
-            if isinstance(R, torch.Tensor):
-                trans = torch.eye(4).to(R.device)
-            else:
-                trans = np.eye(4)
-            trans[:3, :3] = R
-            trans[:3, 3:4] = t
-        return trans
+        return se3.integrate_trans(R, t)
 
 
 if __name__ == '__main__':
@@ -298,8 +359,8 @@ if __name__ == '__main__':
     # model = NonLocalNetwork()
     # model(cors_feature.transpose(1, 2), beta_attention)
 
-    cors_pos = torch.rand((2, 10, 6))
-    src_keypts = torch.rand((2, 10, 3))
-    tgt_keypts = torch.rand((2, 10, 3))
+    cors_pos = torch.rand((2, 1024, 6))
+    src_keypts = torch.rand((2, 1024, 3))
+    tgt_keypts = torch.rand((2, 1024, 3))
     model = PointDSCRework()
     model(cors_pos, src_keypts, tgt_keypts)

@@ -127,6 +127,7 @@ class DGCNN(torch.nn.Module):
         output_graph_conv = self.graphconv1(output_transformer, adj)
 
         show(output_neighbour_avg_pts.permute(1, 0, 2)[1].detach().cpu().numpy(),
+             output_transformer[1].detach().cpu().numpy(),
              output_graph_conv[1].detach().cpu().numpy())
 
         return output
