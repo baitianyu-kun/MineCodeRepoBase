@@ -107,7 +107,8 @@ def transformationloss(trans, gt_trans, src_keypts, tgt_keypts, probs, re_thre=1
         if re[i] < re_thre and te[i] < te_thre:
             recall += 1
     # RPMNet Eq 10
-    loss = ((src_keypts_trans - tgt_keypts) ** 2).sum(-1).mean()
+    # loss = ((src_keypts_trans - tgt_keypts) ** 2).sum(-1).mean()
+    loss = nn.MSELoss(src_keypts_trans - tgt_keypts)
     return loss / batch_size, recall * 100 / batch_size, re.sum(-1) / batch_size, te.flatten().sum(
         -1) / batch_size, rmse / batch_size
 

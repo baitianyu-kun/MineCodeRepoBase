@@ -3,6 +3,17 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
+from se_math import so3
+
+
+def compute_R_t_metrics(R, t, Rgt, tgt):
+    inv_R, inv_t = inv_R_t(R, t)
+    r_mse, r_mae = anisotropic_R_error(R, inv_R)
+    t_mse, t_mae = anisotropic_t_error(t, inv_t)
+    r_isotropic = isotropic_R_error(R, inv_R)
+    t_isotropic = isotropic_t_error(t, inv_t, inv_R)
+    return r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic
+
 
 def inv_R_t(R, t):
     inv_R = R.permute(0, 2, 1).contiguous()

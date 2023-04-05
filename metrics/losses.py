@@ -2,6 +2,23 @@ import torch
 import numpy as np
 from torch import nn
 import torch.nn.functional as F
+import se_math.se3 as se3
+
+
+def transformation_loss(src_keypts, tgt_keypts, pred_transforms, loss_type='mae'):
+    """ return transformation loss: RPMNET Eq 10
+    Args:
+        src_keypts, tgt_keypts: (B, num_pts, 3)
+        pred_transforms: (B, 4, 4)
+    Returns:
+    """
+    src_keypts_pred = se3.transform_torch(pred_transforms, src_keypts)
+    if loss_type == 'mse':
+        return nn.MSELoss()(src_keypts_pred, tgt_keypts)
+    elif loss_type == 'mae':
+        return nn.L1Loss()(src_keypts_pred, tgt_keypts)
+    else:
+        return torch.norm(src_keypts_pred - tgt_keypts)
 
 
 def chamfer_loss(a, b):

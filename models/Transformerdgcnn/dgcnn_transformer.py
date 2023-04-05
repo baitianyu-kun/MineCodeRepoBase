@@ -83,8 +83,11 @@ class GraphConvolution(torch.nn.Module):
         batch_size, num_nodes, dims = inputs.shape
         outputs = torch.empty((batch_size, num_nodes, dims)).cuda()
         for i in range(batch_size):
+            # inputs: (1024, 3)
+            # support: (1024, 3)
             support = torch.mm(inputs[i], self.weight)
-            # (numpts, dims)
+            # adjs[i]: (1024, 1024)
+            # output: (num_pts, dims)
             output = torch.spmm(adjs[i], support)
             if self.bias is not None:
                 output = output + self.bias
@@ -110,23 +113,19 @@ class DGCNN(torch.nn.Module):
         if input_data.shape[1] != 3:
             raise RuntimeError("shape of x must be of [Batch x 3 x NumInPoints]")
         batch_size, num_dims, num_points = input_data.size()
-        # feature output : (batch, num_pts, neighbours, dims)
+        # output: (batch, num_pts, neighbours, 3)
+        # adj: (batch, num_pts, num_pts)
+        # 此处构建图, 然后下面就应该提取原节点(or the avg of knn each point?)的特征了
         output, adj = get_graph_feature_adj(input_data)
 
-        # 给这几个neighbours进行平均池化，变成一个点，然后对每个点进行transformer，最后按照V2再进行一个AdjMatrix的卷积
-        # avg : (batch, num_pts, dims) -> (1, 1024, 3) 经过平均聚合后的点
-        output_neighbour_avg_pts = torch.mean(output, dim=2)
-
-        # transformer input : (seqlength, batch, dim) -> (1024, 2, 3)
-        output_neighbour_avg_pts = output_neighbour_avg_pts.permute(1, 0, 2)
-        # output_transformer : (1024, 2, 3)
-        output_transformer = self.atten1(output_neighbour_avg_pts.to(torch.float32))
+        # input_data: (2, 3, 1024) -> (1024, 2, 3): (seqlength, batch, dim)
+        output_transformer = self.atten1(input_data.permute(2, 0, 1).to(torch.float32))
         # Change back (2, 1024, 3)
         output_transformer = output_transformer.permute(1, 0, 2)
 
         output_graph_conv = self.graphconv1(output_transformer, adj)
 
-        show(output_neighbour_avg_pts.permute(1, 0, 2)[1].detach().cpu().numpy(),
+        show(input_data.transpose(1,2)[1].detach().cpu().numpy(),
              output_transformer[1].detach().cpu().numpy(),
              output_graph_conv[1].detach().cpu().numpy())
 
@@ -140,12 +139,12 @@ if __name__ == '__main__':
     # y = dgcnn(x)
     # print("\nInput Shape of DGCNN: ", x.shape, "\nOutput Shape of DGCNN: ", y.shape)
 
-    data = np.loadtxt('../test/data/airplane_0010.txt', delimiter=',')[:, 0:3]
-    data = farthest_avg_subsample_points(data, 2048)
+    data = np.loadtxt('../../test/data/airplane_0010.txt', delimiter=',')[:, 0:3]
+    data = farthest_avg_subsample_points(data, 1024)
     data = torch.from_numpy(data).unsqueeze(0).cuda()
 
-    data2 = np.loadtxt('../test/data/airplane_0627.txt', delimiter=',')[:, 0:3]
-    data2 = farthest_avg_subsample_points(data2, 2048)
+    data2 = np.loadtxt('../../test/data/airplane_0627.txt', delimiter=',')[:, 0:3]
+    data2 = farthest_avg_subsample_points(data2, 1024)
     data2 = torch.from_numpy(data2).unsqueeze(0).cuda()
 
     data_batch2 = torch.concat([data, data2]).cuda()
