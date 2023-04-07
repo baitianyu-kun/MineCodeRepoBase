@@ -1,5 +1,5 @@
 import random
-
+import matplotlib.pyplot as plt
 import open3d as o3d
 import numpy as np
 
@@ -138,11 +138,34 @@ def showRGBY(points1, points2, points3, points4, light_mode=False):
     vis.destroy_window()
 
 
+def show_matplot(points,
+                 title='Graph Title',
+                 xyz_labels=None):
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    x = points[:, 0]  # x position of point
+    y = points[:, 2]  # y position of point
+    z = points[:, 1]  # z position of point
+    ax.scatter(x, y, z, c=z)
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(-1, 1)
+    ax.set_zlim(-1, 1)
+    ax.set_title(title)
+    if xyz_labels is not None:
+        ax.set_xlabel(xyz_labels[0])
+        ax.set_ylabel(xyz_labels[1])
+        ax.set_zlabel(xyz_labels[2])
+    plt.show()
+
+
 if __name__ == '__main__':
     # data = np.genfromtxt('../data/1a04e3eab45ca15dd86060f189eb133.txt', delimiter=' ')[:, 0:3]
     # data2 = np.genfromtxt('../data/1a680e3308f2aac544b2fa2cac0778f5.txt', delimiter=' ')[:, 0:3]
     # show(data, data2)
 
-    showRGB(np.load('../result/best_model_predict/epoch_6/showed_p0.npy'),
-            np.load('../result/best_model_predict/epoch_6/showed_p1.npy'),
-            np.load('../result/best_model_predict/epoch_6/show_p_use_est_g.npy'), )
+    # showRGB(np.load('../result/best_model_predict/epoch_6/showed_p0.npy'),
+    #         np.load('../result/best_model_predict/epoch_6/showed_p1.npy'),
+    #         np.load('../result/best_model_predict/epoch_6/show_p_use_est_g.npy'), )
+
+    data = np.loadtxt('../test/data/airplane_0627.txt', delimiter=',')[:, 0:3]
+    show_matplot(data)

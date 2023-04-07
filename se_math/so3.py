@@ -16,7 +16,9 @@ def dcm2euler(mats: np.ndarray, seq: str = 'zyx', degrees: bool = True):
     """
     eulers = []
     for i in range(mats.shape[0]):
-        r = Rotation.from_dcm(mats[i])
+        # r = Rotation.from_dcm(mats[i])
+        # CHANGED THIS MAY BE RIGHT
+        r = Rotation.from_matrix(mats[i])
         eulers.append(r.as_euler(seq, degrees=degrees))
     return np.stack(eulers)
 
@@ -65,6 +67,7 @@ def RG2angle(G):
     """
     rot_trace = G[:, 0, 0] + G[:, 1, 1] + G[:, 2, 2]
     rot_deg = torch.acos(torch.clamp(0.5 * (rot_trace - 1), min=-1.0, max=1.0)) * 180.0 / np.pi
+    # return torch.rad2deg(rot_deg) can also use this
     return rot_deg
 
 
