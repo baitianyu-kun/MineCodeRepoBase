@@ -139,11 +139,11 @@ if __name__ == '__main__':
     # y = dgcnn(x)
     # print("\nInput Shape of DGCNN: ", x.shape, "\nOutput Shape of DGCNN: ", y.shape)
 
-    data = np.loadtxt('../../test/data/airplane_0010.txt', delimiter=',')[:, 0:3]
+    data = np.loadtxt('../../../test/data/airplane_0010.txt', delimiter=',')[:, 0:3]
     data = farthest_avg_subsample_points(data, 1024)
     data = torch.from_numpy(data).unsqueeze(0).cuda()
 
-    data2 = np.loadtxt('../../test/data/airplane_0627.txt', delimiter=',')[:, 0:3]
+    data2 = np.loadtxt('../../../test/data/airplane_0627.txt', delimiter=',')[:, 0:3]
     data2 = farthest_avg_subsample_points(data2, 1024)
     data2 = torch.from_numpy(data2).unsqueeze(0).cuda()
 

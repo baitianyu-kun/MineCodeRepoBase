@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import utils.data_utils as du
-from models.Transformerdgcnn.dgcnn_transformer import knn
+from models.DGCNN.Transformerdgcnn.dgcnn_transformer import knn
 
 data = np.loadtxt('../data/airplane_0010.txt', delimiter=',')[:, 0:3]
 data = du.farthest_avg_subsample_points(data, 5)

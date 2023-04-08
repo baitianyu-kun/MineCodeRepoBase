@@ -202,6 +202,13 @@ def random_rotation(max_angle):
     return R
 
 
+def random_translation(max_dist):
+    t = np.random.randn(3)
+    t /= np.linalg.norm(t)
+    t *= np.random.rand() * max_dist
+    return np.expand_dims(t, 1)
+
+
 def rotation_x_matrix(theta):
     mat = np.eye(3, dtype=np.float32)
     mat[1, 1] = math.cos(theta)
@@ -227,13 +234,6 @@ def rotation_z_matrix(theta):
     mat[1, 0] = math.sin(theta)
     mat[1, 1] = math.cos(theta)
     return mat
-
-
-def random_translation(max_dist):
-    t = np.random.randn(3)
-    t /= np.linalg.norm(t)
-    t *= np.random.rand() * max_dist
-    return np.expand_dims(t, 1)
 
 
 def random_select_points(pc, m):
