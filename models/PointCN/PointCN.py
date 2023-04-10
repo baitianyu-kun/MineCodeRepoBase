@@ -7,6 +7,7 @@ and it was made to point cloud using model
 '''
 
 
+# actually this is equals to torch.nn.InstanceNorm1d
 class ContextNormalization(nn.Module):
     def __init__(self):
         super(ContextNormalization, self).__init__()
@@ -20,7 +21,7 @@ class ContextNormalization(nn.Module):
 
 
 class PointCN(nn.Module):
-    def __init__(self, in_dim=6, num_layers=6, num_channels=128, act_pos='post'):
+    def __init__(self, in_dim=3, num_layers=2, num_channels=128, act_pos='post'):
         super(PointCN, self).__init__()
         assert act_pos == 'pre' or act_pos == 'post'
 
@@ -41,3 +42,9 @@ class PointCN(nn.Module):
     def forward(self, x):
         features = self.encoder(x)
         return features
+
+
+if __name__ == '__main__':
+    pointcn = PointCN()
+    data = torch.rand((2, 3, 1024))
+    print(pointcn(data).shape)
