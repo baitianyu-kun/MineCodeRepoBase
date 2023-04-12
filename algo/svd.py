@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+import se_math.se3 as se3
 
 _EPS = 1e-6
 
@@ -37,6 +38,7 @@ def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Ten
     u, s, v = torch.svd(cov, some=False, compute_uv=True)
     rot_mat_pos = v @ u.transpose(-1, -2)
     v_neg = v.clone()
+    # det (VU^T) = -1 的情况
     v_neg[..., 2] *= -1
     rot_mat_neg = v_neg @ u.transpose(-1, -2)
     rot_mat = torch.where(torch.det(rot_mat_pos)[..., None, None] > 0, rot_mat_pos, rot_mat_neg)
@@ -49,6 +51,49 @@ def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Ten
     temp[:, 3, 3] = 1
     transform = temp
     return transform
+
+
+def compute_rigid_transform2(A, B, weights=None, weight_threshold=0):
+    """
+    Input:
+        - A:       [bs, num_corr, 3], source point cloud
+        - B:       [bs, num_corr, 3], target point cloud
+        - weights: [bs, num_corr]     weight for each correspondence
+        - weight_threshold: float,    clips points with weight below threshold
+    Output:
+        - R, t
+    """
+    bs = A.shape[0]
+    if weights is None:
+        weights = torch.ones_like(A[:, :, 0])
+    weights[weights < weight_threshold] = 0
+    # weights = weights / (torch.sum(weights, dim=-1, keepdim=True) + 1e-6)
+
+    # find mean of point cloud
+    # CHANGED normalize weights right here !!!
+    centroid_A = torch.sum(A * weights[:, :, None], dim=1, keepdim=True) / (
+            torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6)
+    centroid_B = torch.sum(B * weights[:, :, None], dim=1, keepdim=True) / (
+            torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6)
+
+    # subtract mean
+    Am = A - centroid_A
+    Bm = B - centroid_B
+
+    # construct weight covariance matrix
+    Weight = torch.diag_embed(weights)
+    H = Am.permute(0, 2, 1) @ Weight @ Bm
+
+    # find rotation
+    U, S, Vt = torch.svd(H.cpu())
+    U, S, Vt = U.to(weights.device), S.to(weights.device), Vt.to(weights.device)
+    # det (VU^T) = -1 和 det (VU^T) = -1 的情况, 使用通用公式
+    delta_UV = torch.det(Vt @ U.permute(0, 2, 1))
+    eye = torch.eye(3)[None, :, :].repeat(bs, 1, 1).to(A.device)
+    eye[:, -1, -1] = delta_UV
+    R = Vt @ eye @ U.permute(0, 2, 1)
+    t = centroid_B.permute(0, 2, 1) - R @ centroid_A.permute(0, 2, 1)
+    return se3.integrate_trans(R, t)
 
 
 class SVDHead(nn.Module):
@@ -76,6 +121,7 @@ class SVDHead(nn.Module):
         H = torch.matmul(src_centered, src_corr_centered.transpose(2, 1).contiguous())
         U, S, V = [], [], []
         R = []
+        # CALCULATE PER BATCH R, t
         for i in range(src.size(0)):
             u, s, v = torch.svd(H[i])
             r = torch.matmul(v, u.transpose(1, 0).contiguous())

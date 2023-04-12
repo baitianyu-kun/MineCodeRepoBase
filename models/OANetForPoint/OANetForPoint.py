@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import se_math.se3 as se3
+import algo.svd as svd
 
 '''
 from Learning Two-View Correspondences and Geometry Using Order-Aware Network
@@ -162,38 +164,43 @@ class OANet(nn.Module):
 
         self.output = nn.Conv1d(num_channels, 1, kernel_size=1)
 
-    def forward(self, data):
-        corr_pos = data['corr_pos'].permute(0, 2, 1)
+    def forward(self, corr_pos, src_keypts, tgt_keypts):
+        # CHANGED only support one batch !!!!
+        corr_pos = corr_pos.permute(0, 2, 1)
         # corr_pos [bs, num_corr, in_dim]
         # corr_pos = corr_pos.permute(0,2,1)
         x1_1 = self.l1_1(corr_pos)
         x_down = self.down1(x1_1)
         x2 = self.l2(x_down)
         x_up = self.up1(x1_1, x2)
-
+        # OANet output
         out = self.l1_2(torch.cat([x1_1, x_up], dim=1))
-        return out
-
+        # logits (1, num_pts)
         logits = self.output(out).squeeze(1)
+        # torch.where(logits > 0) -> (row0,row1,row2) and (col0,col1,col2) -> logits(row0, col0) > 0
+        # torch.where(logits > 0)[1] -> (col0, col1, col2)
+
+        # G = svd.compute_rigid_transform2(A, B, weights)
+        # G2 = svd.compute_rigid_transform(A, B, weights)
 
         if len(torch.where(logits > 0)[1]) >= 3:
-            R, t = rigid_transform_3d(
+            G = svd.compute_rigid_transform2(
                 A=src_keypts[:, torch.where(logits > 0)[1], :],
                 B=tgt_keypts[:, torch.where(logits > 0)[1], :],
-                scores=torch.relu(torch.tanh(logits[:, torch.where(logits > 0)[1]])),
+                weights=torch.relu(torch.tanh(logits[:, torch.where(logits > 0)[1]]))
             )
         else:
             R = torch.eye(3)[None, :, :].to(corr_pos.device)
             t = torch.ones(1, 3)[None, :, :].to(corr_pos.device)
+            G = se3.integrate_trans(R, t)
 
-        R = torch.cat([R, torch.zeros_like(R[:, 0:1, :])], dim=1)
-        t = t.permute(0, 2, 1)
-        t = torch.cat([t, torch.ones_like(t[:, 0:1, :])], dim=1)
-        trans = torch.cat([R, t], dim=-1)
+        print(G)
 
-        res = {
-            "final_trans": trans,
-            "final_labels": logits,
-            "M": None
-        }
-        return res
+
+if __name__ == '__main__':
+    # CHANGED ONLY SUPPORT ONE BATCH !!!!!
+    corr_pos = torch.rand((1, 10, 6))
+    src_keypts = torch.rand((1, 10, 3))
+    tgt_keypts = torch.rand((1, 10, 3))
+    oanet = OANet()
+    oanet(corr_pos, src_keypts, tgt_keypts)
