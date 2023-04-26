@@ -1,6 +1,5 @@
 import logging
-import model.simpleunet as simpleunets
-import model.resunet as resunets
+from code_project1 import test_model as simpleunets, test_model as resunets
 
 MODELS = []
 

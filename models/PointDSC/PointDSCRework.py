@@ -359,8 +359,8 @@ if __name__ == '__main__':
     # model = NonLocalNetwork()
     # model(cors_feature.transpose(1, 2), beta_attention)
 
-    cors_pos = torch.rand((2, 1024, 6))
-    src_keypts = torch.rand((2, 1024, 3))
-    tgt_keypts = torch.rand((2, 1024, 3))
+    cors_pos = torch.rand((1, 10, 6))
+    src_keypts = torch.rand((1, 10, 3))
+    tgt_keypts = torch.rand((1, 10, 3))
     model = PointDSCRework()
     model(cors_pos, src_keypts, tgt_keypts)

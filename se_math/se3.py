@@ -193,6 +193,17 @@ def inverse(g):
     return ig.view(*(g.size()[0:-2]), 4, 4)
 
 
+def inverse_np(g):
+    R = g[0:3, 0:3]
+    t = g[0:3, 3]
+    inv_R = R.T  # (3, 3)
+    inv_t = -np.matmul(inv_R, t)  # (3,)
+    inv_G = np.eye(4)
+    inv_G[0:3, 0:3] = inv_R
+    inv_G[0:3, 3] = inv_t
+    return inv_G
+
+
 def log(g):
     """ SE3 -> se3
     Args:

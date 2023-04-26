@@ -30,7 +30,7 @@ class ThreeDMatch(Dataset):
         pt = farthest_avg_subsample_points(pt, self.num_pts)
         Ggt = random_pose(self.max_angle, self.max_t)
         Rgt, tgt = se3.decompose_trans(Ggt)
-        # p template -> p source
+        # p template -> p source: Ggt
         # So p source -> inverse Ggt -> p template
         # So model output G: G == inverse Ggt
         # So model output R: R == inverse Rgt
@@ -45,7 +45,8 @@ class ThreeDMatch(Dataset):
             pt = np.random.permutation(pt)
             ps = np.random.permutation(ps)
 
-        return pt, ps, Ggt, Rgt, tgt
+        return pt.astype('float32'), ps.astype('float32'), Ggt.astype('float32'), Rgt.astype('float32'), tgt.astype(
+            'float32')
 
     def __len__(self):
         return self.data.shape[0]

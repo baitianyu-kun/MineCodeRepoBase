@@ -30,6 +30,20 @@ def load_data(DATA_DIR, partition, file_type='modelnet40'):
             points = points[points_idx[:num_points], :]
             all_data.append(points)
         return np.array(all_data), np.array(all_label)
+    elif file_type == '3DMatchHome':
+        num_points = 10000
+        all_data = []
+        all_label = []
+        for h5_name in glob.glob(
+                os.path.join(DATA_DIR, 'cloud_bin_*.ply')):
+            pc = o3d.io.read_point_cloud(h5_name)
+            points = normalize_pc(np.array(pc.points))
+            # 采样10000个点
+            points_idx = np.arange(points.shape[0])
+            np.random.shuffle(points_idx)
+            points = points[points_idx[:num_points], :]
+            all_data.append(points)
+        return np.array(all_data), np.array(all_label)
     elif file_type == '3DMatch_all':
         num_points = 4096
         file_name = '3dmatch_all'

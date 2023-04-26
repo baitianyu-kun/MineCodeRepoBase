@@ -4,6 +4,8 @@ import torch
 from scipy.spatial.transform import Rotation
 
 from se_math import so3
+import utils
+import se_math
 
 
 # p template -> gtR -> p source
@@ -36,6 +38,13 @@ def summary_R_t_metrics(r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic):
 
 
 def inv_R_t(R, t):
+    '''
+    Args:
+        R: (batch, 3, 3)
+        t: (batch, 3)
+           can use torch.squeeze(t) to change (batch, 3, 1) into (batch, 3)
+    Returns:
+    '''
     inv_R = R.permute(0, 2, 1).contiguous()
     inv_t = - inv_R @ t[..., None]
     return inv_R, torch.squeeze(inv_t, -1)
@@ -171,3 +180,19 @@ def compute_tmse_mae(t_est, t):
     t_mse = np.mean((t_est - t) ** 2, axis=1)
     t_mae = np.mean(np.abs(t_est - t), axis=1)
     return np.mean(t_mse), np.mean(t_mae)
+
+
+if __name__ == '__main__':
+    def get():
+        Ggt = utils.data_utils.random_pose(max_angle=45, max_trans=0.02)
+        Ggt2 = utils.data_utils.random_pose(max_angle=45, max_trans=0.02)
+        G_all = torch.concat([torch.from_numpy(Ggt).unsqueeze(0), torch.from_numpy(Ggt2).unsqueeze(0)])
+        Rgt, tgt = se_math.se3.decompose_trans((G_all))
+        return Rgt, tgt
+
+
+    Rgt1, tgt1 = get()
+    Rgt2, tgt2 = get()
+    print(tgt1)
+    print(torch.squeeze(tgt1))
+    print(compute_R_t_metrics(Rgt1, torch.squeeze(tgt1), Rgt2, torch.squeeze(tgt2)))

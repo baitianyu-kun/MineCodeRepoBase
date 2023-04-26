@@ -1,7 +1,7 @@
 import torch
 import MinkowskiEngine as ME
 import MinkowskiEngine.MinkowskiFunctional as MEF
-from model.common import get_norm
+from code_project1.test_model import get_norm
 
 
 class SimpleNet(ME.MinkowskiNetwork):

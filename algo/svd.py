@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import math
@@ -142,3 +143,10 @@ class SVDHead(nn.Module):
         R = torch.stack(R, dim=0)
         t = torch.matmul(-R, src.mean(dim=2, keepdim=True)) + src_corr.mean(dim=2, keepdim=True)
         return R, t.view(batch_size, 3)
+
+
+if __name__ == '__main__':
+    p1 = torch.rand((2, 1024, 3)).cuda()
+    p2 = torch.rand((2, 1024, 3)).cuda()
+    weight = torch.rand((2, 1024)).cuda()
+    print(compute_rigid_transform2(p1, p2, weight))

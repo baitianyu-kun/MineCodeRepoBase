@@ -274,13 +274,13 @@ def farthest_neighbour_subsample_points(pointcloud1, pointcloud2, num_subsampled
 
 
 def farthest_neighbour_subsample_points2(pointcloud1, src_subsampled_points, tgt_subsampled_points=None):
-    """
+    '''
     Args:
-        pointcloud1:
-        src_subsampled_points:
-        tgt_subsampled_points:
+        pointcloud1: pts
+        src_subsampled_points: num_pts
+        tgt_subsampled_points: num_pts
     Returns:
-    """
+    '''
     # (num_points, 3)
     pointcloud1 = pointcloud1
     num_points = pointcloud1.shape[0]
@@ -301,14 +301,57 @@ def farthest_neighbour_subsample_points2(pointcloud1, src_subsampled_points, tgt
                                     metric=lambda x, y: minkowski(x, y)).fit(pointcloud1[:, :3])
         random = np.random.random(size=(1, 3))
         random_p1 = random + np.array([[500, 500, 500]])
+
         src = nbrs_src.kneighbors(random_p1, return_distance=False).reshape((src_subsampled_points,))
         mask_src = torch.zeros(num_points).scatter_(0, torch.tensor(src), 1)  # (src_subsampled_points)
         src = torch.sort(torch.tensor(src))[0]
+
         random_p2 = random - np.array([[500, 500, 500]])
         tgt = nbrs_tgt.kneighbors(random_p2, return_distance=False).reshape((tgt_subsampled_points,))
         mask_tgt = torch.zeros(num_points).scatter_(0, torch.tensor(tgt), 1)  # (tgt_subsampled_points)
         tgt = torch.sort(torch.tensor(tgt))[0]
         return pointcloud1[src, :], mask_src, pointcloud1[tgt, :], mask_tgt
+
+
+def get_src_tgt_mask(mask_src, mask_tgt):
+    '''若ps和pt都进行了mask的话,则farthest_neighbour_subsample_points2返回的是ps和pt相对于原始点
+    points的mask,所以这里需要得到src和tgt之间的mask
+    Args:
+        mask_src:
+        mask_tgt:
+    Returns:
+    '''
+    num_pts = mask_src.shape[0]
+    gt_mask_src = []
+    gt_mask_tgt = []
+    for i in range(num_pts):
+        if mask_src[i] == 1 and mask_tgt[i] == 1:
+            gt_mask_src.append(1)
+            gt_mask_tgt.append(1)
+        elif mask_src[i] == 1 and mask_tgt[i] == 0:
+            gt_mask_src.append(0)
+        elif mask_src[i] == 0 and mask_tgt[i] == 1:
+            gt_mask_tgt.append(0)
+    gt_mask_src = torch.Tensor(gt_mask_src)
+    gt_mask_tgt = torch.Tensor(gt_mask_tgt)
+    return gt_mask_src, gt_mask_tgt
+
+
+def farthest_neighbour_subsample_points3(pointcloud1, num_subsampled_points=768):
+    '''farthest_neighbour_subsample_points2的tgt_subsampled_points为None的情况
+    Args:
+        pointcloud1:
+        num_subsampled_points:
+    Returns:
+    '''
+    pointcloud1 = pointcloud1
+    num_points = pointcloud1.shape[0]
+    nbrs1 = NearestNeighbors(n_neighbors=num_subsampled_points, algorithm='auto',
+                             metric=lambda x, y: minkowski(x, y)).fit(pointcloud1[:, :3])
+    random_p1 = np.random.random(size=(1, 3)) + np.array([[500, 500, 500]]) * np.random.choice([1, -1, 1, -1])
+    idx1 = nbrs1.kneighbors(random_p1, return_distance=False).reshape((num_subsampled_points,))
+    gt_mask = torch.zeros(num_points).scatter_(0, torch.tensor(idx1), 1)
+    return pointcloud1[idx1, :], gt_mask
 
 
 def farthest_avg_subsample_points(point, npoint):
