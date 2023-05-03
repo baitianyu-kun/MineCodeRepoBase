@@ -64,12 +64,14 @@ def train_one_epoch(model, opt, train_loader, epoch):
     train_loop.set_description(f'Train [{epoch}]')
     r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic = [], [], [], [], [], []
     for i, data in train_loop:
-        ps, pt, iGgt, iRgt, itgt = data
+        ps, pt, iGgt, iRgt, itgt, gt_mask_src, gt_mask_tgt = data
         ps = ps.to(device).transpose(1, 2)
         pt = pt.to(device).transpose(1, 2)
-        iGgt=iGgt.to(device)
-        iRgt=iRgt.to(device)
-        itgt=itgt.to(device)
+        iGgt = iGgt.to(device)
+        iRgt = iRgt.to(device)
+        itgt = itgt.to(device)
+        gt_mask_src = gt_mask_src.to(device)
+        gt_mask_tgt = gt_mask_tgt.to(device)
 
         Rpre, tpre, global_alignment_loss, consensus_loss, spatial_consistency_loss = model(ps, pt)
 
@@ -111,12 +113,14 @@ def test_one_epoch(model, test_loader, epoch):
     r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic = [], [], [], [], [], []
     with torch.no_grad():
         for i, data in test_loop:
-            ps, pt, iGgt, iRgt, itgt = data
+            ps, pt, iGgt, iRgt, itgt, gt_mask_src, gt_mask_tgt = data
             ps = ps.to(device).transpose(1, 2)
             pt = pt.to(device).transpose(1, 2)
             iGgt = iGgt.to(device)
             iRgt = iRgt.to(device)
             itgt = itgt.to(device)
+            gt_mask_src = gt_mask_src.to(device)
+            gt_mask_tgt = gt_mask_tgt.to(device)
 
             Rpre, tpre, global_alignment_loss, consensus_loss, spatial_consistency_loss = model(ps, pt)
             loss = global_alignment_loss.sum() + consensus_loss.sum() + spatial_consistency_loss.sum()
@@ -162,14 +166,13 @@ if __name__ == '__main__':
     epoches = 100
     batch_size = 2
     lr = 0.01
-    dim_k = 1024
     num_pts = 1024
     max_angle = 45
     max_t = 0.5
     noise = 0.01
     shuffle_pts = True
-    subsampled_rate_src = 0.6
-    subsampled_rate_tgt = 0.6
+    subsampled_rate_src = 0.7
+    subsampled_rate_tgt = 0.7
     workers = 4
     DATA_DIR = 'D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1'
     device = 'cuda:0'
@@ -183,12 +186,12 @@ if __name__ == '__main__':
     logger, log_path = utils.logger.prepare_logger(log_save_path, log_name)
 
     trainloader = torch.utils.data.DataLoader(
-        ThreeDMatch(DATA_DIR, partition='train', partial_overlap=0, num_pts=num_pts, max_angle=max_angle,
+        ThreeDMatch(DATA_DIR, partition='train', partial_overlap=2, num_pts=num_pts, max_angle=max_angle,
                     max_t=max_t, shuffle_pts=shuffle_pts, subsampled_rate_src=subsampled_rate_src,
                     subsampled_rate_tgt=subsampled_rate_tgt),
         batch_size=batch_size, shuffle=True, num_workers=workers)
     testloader = torch.utils.data.DataLoader(
-        ThreeDMatch(DATA_DIR, partition='test', partial_overlap=0, num_pts=num_pts, max_angle=max_angle,
+        ThreeDMatch(DATA_DIR, partition='test', partial_overlap=2, num_pts=num_pts, max_angle=max_angle,
                     max_t=max_t, shuffle_pts=shuffle_pts, subsampled_rate_src=subsampled_rate_src,
                     subsampled_rate_tgt=subsampled_rate_tgt),
         batch_size=batch_size, shuffle=True, num_workers=workers)

@@ -1,0 +1,43 @@
+import math
+
+import numpy as np
+import torch
+import torch.nn as nn
+from feature_extract import DGCNN
+from transformer_module import Transformer
+
+
+class OAMatcherNet(nn.Module):
+    def __init__(self):
+        super(OAMatcherNet, self).__init__()
+        self.feature_extractor = DGCNN(emb_dims=512)
+        self.transformer_module = Transformer(emb_dims=512, n_blocks=1, dropout=0.0, ff_dims=1024, n_heads=4)
+
+    def forward(self, ps, pt):
+        ps_feature = self.feature_extractor(ps)
+        pt_feature = self.feature_extractor(pt)
+        ps_emb, pt_emb = self.transformer_module(ps_feature, pt_feature)
+        dim_k = ps_emb.shape[1]
+        ps_emb = ps_feature + ps_emb
+        pt_emb = pt_feature + pt_emb
+        match_mtx = torch.bmm(ps_emb.transpose(1, 2), pt_emb) / math.sqrt(dim_k)
+        match_mtx = torch.softmax(match_mtx, dim=2)
+        match_mtx_ps = torch.zeros_like(match_mtx)
+        match_mtx_pt = torch.zeros_like(match_mtx)
+        # 每行最大的即ps
+        match_mtx_row, match_mtx_row_index = torch.max(match_mtx, dim=2, keepdim=True)
+        # 每列最大的即pt
+        match_mtx_col, match_mtx_col_index = torch.max(match_mtx, dim=1, keepdim=True)
+        # match_mtx_ps每个行最大处为该元素值,其他值为0
+        match_mtx_ps = match_mtx_ps.scatter(2, match_mtx_row_index, match_mtx_row)
+        # match_mtx_ps每个列最大处为该元素值,其他值为0
+        match_mtx_pt = match_mtx_pt.scatter(1, match_mtx_col_index, match_mtx_col)
+        np.save('match_mtx_ps',match_mtx_ps[0].detach().cpu().numpy())
+        np.save('match_mtx_pt',match_mtx_pt[0].detach().cpu().numpy())
+
+
+if __name__ == '__main__':
+    OAMatcher = OAMatcherNet().cuda()
+    data1 = torch.rand((2, 3, 1024)).cuda()
+    data2 = torch.rand((2, 3, 1024)).cuda()
+    OAMatcher(data1, data2)

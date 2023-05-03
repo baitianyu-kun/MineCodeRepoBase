@@ -215,9 +215,10 @@ class RIENET(nn.Module):
         return rotation_ab_pred, translation_ab_pred, global_alignment_loss, consensus_loss, spatial_consistency_loss
 
 
-# if __name__ == '__main__':
-#     src = torch.rand((2, 3, 1024)).cuda()
-#     tgt = torch.rand((2, 3, 1024)).cuda()
-#     rie = RIENET().cuda()
-#     rotation_ab_pred, translation_ab_pred, global_alignment_loss, consensus_loss, spatial_consistency_loss=rie(src, tgt)
-#     print(translation_ab_pred)
+if __name__ == '__main__':
+    src = torch.rand((2, 3, 1024)).cuda()
+    tgt = torch.rand((2, 3, 1024)).cuda()
+    rie = RIENET().cuda()
+    rotation_ab_pred, translation_ab_pred, global_alignment_loss, consensus_loss, spatial_consistency_loss = rie(src,
+                                                                                                                 tgt)
+    print(translation_ab_pred)
