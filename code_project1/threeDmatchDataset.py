@@ -21,8 +21,8 @@ class ThreeDMatch(Dataset):
                  max_angle=45, max_t=0.5,
                  noise=0.0,
                  shuffle_pts=True,
-                 subsampled_rate_src=0.6,
-                 subsampled_rate_tgt=0.6):
+                 subsampled_rate_src=0.7,
+                 subsampled_rate_tgt=0.7):
 
         logger = logging.getLogger()
         logger.info(f'Start loading {partition} data.....')
@@ -73,7 +73,8 @@ class ThreeDMatch(Dataset):
                 pt = np.random.permutation(pt)
                 np.random.set_state(state)
                 gt_mask_src = np.random.permutation(gt_mask_src)
-            return ps.astype('float32'), pt.astype('float32'), iGgt.astype('float32'), iRgt.astype('float32'), itgt.astype('float32'), gt_mask_src
+            return ps.astype('float32'), pt.astype('float32'), iGgt.astype('float32'), iRgt.astype(
+                'float32'), itgt.astype('float32'), gt_mask_src
         elif self.partial_overlap == 0:
             pt = points
             ps = se3.transform_np(iGgt, pt)
@@ -90,13 +91,20 @@ class ThreeDMatch(Dataset):
 
 if __name__ == '__main__':
     # partial_overlap=2
-    # ps, pt, iGgt, iRgt, itgt, gt_mask_src, gt_mask_tgt = ThreeDMatch(DATA_DIR='D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1', partition='train',
-    #                                                                  num_pts=8000).__getitem__(0)
-    # import utils.visual as vi
-    # # Ggt = se3.inverse(torch.from_numpy(iGgt).unsqueeze(0))[0].numpy()
-    # Ggt = se3.inverse_np(iGgt)
-    # vi.show(se3.transform_np(Ggt, ps[gt_mask_src == 1, :]), pt[gt_mask_tgt == 1, :])
-    # vi.show(se3.transform_np(Ggt, ps), pt)
+    ps, pt, iGgt, iRgt, itgt, gt_mask_src, gt_mask_tgt = ThreeDMatch(
+        DATA_DIR='D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1', partition='train',
+        num_pts=8000).__getitem__(0)
+    import utils.visual as vi
+
+    # Ggt = se3.inverse(torch.from_numpy(iGgt).unsqueeze(0))[0].numpy()
+    Ggt = se3.inverse_np(iGgt)
+    vi.show(se3.transform_np(Ggt, ps[gt_mask_src == 1, :]), pt[gt_mask_tgt == 1, :])
+    print(ps.shape)
+    print(ps[gt_mask_src == 1, :].shape)
+
+    print(pt.shape)
+    print(pt[gt_mask_tgt == 1, :].shape)
+    vi.show(se3.transform_np(Ggt, ps), pt)
 
     # partial_overlap=1
     # ps, pt, iGgt, iRgt, itgt, gt_mask_src = ThreeDMatch(DATA_DIR='', partition='train',
@@ -107,6 +115,6 @@ if __name__ == '__main__':
     # vi.show(se3.transform_np(Ggt, ps), pt)
 
     # partial_overlap=1
-    p1, p2,g,r,t = ThreeDMatch(DATA_DIR='D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1', partition='train',
-                         partial_overlap=0, num_pts=8000).__getitem__(0)
-    print(g.to('cuda:0'))
+    # p1, p2,g,r,t = ThreeDMatch(DATA_DIR='D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1', partition='train',
+    #                      partial_overlap=0, num_pts=8000).__getitem__(0)
+    # print(g.to('cuda:0'))

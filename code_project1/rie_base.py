@@ -113,6 +113,42 @@ class DGCNN(nn.Module):
         return x
 
 
+def compute_rigid_transformation(src, src_corr, weight):
+    """
+        Compute rigid transforms between two point sets
+        Args:
+            src: Source point clouds. Size (B, 3, N)
+            src_corr: Pseudo target point clouds. Size (B, 3, N)
+            weights: Inlier confidence. (B, 1, N)
+
+        Returns:
+            R: Rotation. Size (B, 3, 3)
+            t: translation. Size (B, 3, 1)
+    """
+    src2 = (src * weight).sum(dim=2, keepdim=True) / weight.sum(dim=2, keepdim=True)
+    src_corr2 = (src_corr * weight).sum(dim=2, keepdim=True) / weight.sum(dim=2, keepdim=True)
+    src_centered = src - src2
+    src_corr_centered = src_corr - src_corr2
+    H = torch.matmul(src_centered * weight, src_corr_centered.transpose(2, 1).contiguous())
+
+    R = []
+
+    for i in range(src.size(0)):
+        u, s, v = torch.svd(H[i])
+        r = torch.matmul(v, u.transpose(1, 0)).contiguous()
+        r_det = torch.det(r).item()
+        diag = torch.from_numpy(np.array([[1.0, 0, 0],
+                                          [0, 1.0, 0],
+                                          [0, 0, r_det]]).astype('float32')).to(src.device)
+        r = torch.matmul(torch.matmul(v, diag), u.transpose(1, 0)).contiguous()
+        R.append(r)
+
+    R = torch.stack(R, dim=0).to(src.device)
+
+    t = torch.matmul(-R, src2.mean(dim=2, keepdim=True)) + src_corr2.mean(dim=2, keepdim=True)
+    return R, t
+
+
 class Discriminator(nn.Module):
     def __init__(self, dim):
         super(Discriminator, self).__init__()

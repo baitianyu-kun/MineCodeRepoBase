@@ -1,6 +1,6 @@
 from code_project1.rie_loss import *
 from code_project1.rie_base import PointNet, Pointer, get_knn_index, Discriminator, feature_extractor, \
-    get_keypoints
+    get_keypoints, compute_rigid_transformation
 from utils.cors_utils import pairwise_distance_batch
 from algo.svd import compute_rigid_transform2
 import se_math.se3 as se3
@@ -62,8 +62,10 @@ class SVDHead(nn.Module):
         scores = torch.softmax(-distance_map, dim=2)  # [b, n, m]  Eq. (1)
 
         # neighborhood-wise matching map
+        # scores.view(batch_size * num_points, -1): (batch*num_pts, -1)
+        # src_knn_scores: (src_idx1.shape, num_pts)
         src_knn_scores = scores.view(batch_size * num_points, -1)[src_idx1, :]
-
+        # src_knn_scores: (batch, num_pts, k, num_pts)
         src_knn_scores = src_knn_scores.view(batch_size, num_points, k1, num_points)  # [b, n, k, m]
         # 通过点的周围点计算其neighborhood-wise score -> Eq. (2)
         src_knn_scores = torch.gather(
@@ -95,8 +97,7 @@ class SVDHead(nn.Module):
         weight = self.weight_function(knn_distance, src_knn_distance)  # [b, 1, n] # Eq. (7)
 
         # compute rigid transformation
-        G = compute_rigid_transform2(src.transpose(1, 2), src_corr.transpose(1, 2), weight.view(src.shape[0], -1))
-        R, t = se3.decompose_trans(G)
+        R, t = compute_rigid_transformation(src, src_corr,weight)
 
         ########################### Preparation for the Loss Function #########################
         # choose k keypoints with highest weights
@@ -123,7 +124,7 @@ class SVDHead(nn.Module):
         # neighorhood information
         src_keypoints_idx2 = src_topk_idx.unsqueeze(-1).repeat(1, 3, 1, k)  # [b, 3, num_keypoints, k]
         tgt_keypoints_knn = torch.gather(knn_distance.permute(0, 3, 1, 2), dim=2,
-                                         index=src_keypoints_idx2)  # [b, 3, num_kepoints, k]
+                                         index=src_keypoints_idx2)  # [b, 3, num_keypoints, k]
 
         src_transformed = se3.transform_torch(se3.integrate_trans(R, t), src.transpose(1, 2)).transpose(1, 2)
 
@@ -141,12 +142,12 @@ class SVDHead(nn.Module):
 
 class RIENET(nn.Module):
     def __init__(self,
-                 n_keypoints=256,
-                 nn_margin=0.7,
-                 n_iters=1,
+                 n_keypoints=768,
+                 nn_margin=0.5,
+                 n_iters=3,
                  loss_margin=0.01,
-                 list_k1=[5, 5, 5],
-                 list_k2=[5, 5, 5],
+                 list_k1=[8, 8, 8],
+                 list_k2=[8, 8, 8],
                  emb_dims=256,
                  dim=8,
                  ):
@@ -187,6 +188,8 @@ class RIENET(nn.Module):
             src_embedding, src_idx, src_knn, _ = self.emb_nn(src, self.list_k1[i])
             tgt_embedding, _, tgt_knn, _ = self.emb_nn(tgt, self.list_k1[i])
             # 返回Source和Target的Nearest neighbor indices.
+            # src_idx1: (batch * num_pts * k) with base idx
+            # tgt_idx: (batch, num_pts, k) without base idx
             src_idx1, _ = get_knn_index(src, self.list_k2[i])
             _, tgt_idx = get_knn_index(tgt, self.list_k2[i])
 
@@ -216,9 +219,9 @@ class RIENET(nn.Module):
 
 
 if __name__ == '__main__':
-    src = torch.rand((2, 3, 1024)).cuda()
-    tgt = torch.rand((2, 3, 1024)).cuda()
+    src = torch.rand((2, 3, 10)).cuda()
+    tgt = torch.rand((2, 3, 10)).cuda()
     rie = RIENET().cuda()
     rotation_ab_pred, translation_ab_pred, global_alignment_loss, consensus_loss, spatial_consistency_loss = rie(src,
                                                                                                                  tgt)
-    print(translation_ab_pred)
+    # print(translation_ab_pred)
