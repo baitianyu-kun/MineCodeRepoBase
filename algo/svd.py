@@ -47,7 +47,37 @@ def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Ten
     translation = -rot_mat @ centroid_a[..., :, None] + centroid_b[..., :, None]
     transform = torch.cat((rot_mat, translation), dim=-1)
     # CHANGED T ([*,] 3, 4) -> T ([*,] 4, 4)
-    temp = torch.zeros_like(torch.empty(transform.shape[0], 4, 4))
+    temp = torch.zeros_like(torch.empty(transform.shape[0], 4, 4)).to(a.device)
+    temp[:, :3, :4] = transform
+    temp[:, 3, 3] = 1
+    transform = temp
+    return transform
+
+
+def compute_rigid_transform_rpm(a: torch.Tensor, b: torch.Tensor, weights: torch.Tensor):
+    weights_normalized = weights[..., None] / (torch.sum(weights[..., None], dim=1, keepdim=True) + _EPS)
+    centroid_a = torch.sum(a * weights_normalized, dim=1)
+    centroid_b = torch.sum(b * weights_normalized, dim=1)
+    a_centered = a - centroid_a[:, None, :]
+    b_centered = b - centroid_b[:, None, :]
+    cov = a_centered.transpose(-2, -1) @ (b_centered * weights_normalized)
+
+    # Compute rotation using Kabsch algorithm. Will compute two copies with +/-V[:,:3]
+    # and choose based on determinant to avoid flips
+    u, s, v = torch.svd(cov, some=False, compute_uv=True)
+    rot_mat_pos = v @ u.transpose(-1, -2)
+    v_neg = v.clone()
+    v_neg[:, :, 2] *= -1
+    rot_mat_neg = v_neg @ u.transpose(-1, -2)
+    rot_mat = torch.where(torch.det(rot_mat_pos)[:, None, None] > 0, rot_mat_pos, rot_mat_neg)
+    assert torch.all(torch.det(rot_mat) > 0)
+
+    # Compute translation (uncenter centroid)
+    translation = -rot_mat @ centroid_a[:, :, None] + centroid_b[:, :, None]
+
+    transform = torch.cat((rot_mat, translation), dim=2)
+    # CHANGED T ([*,] 3, 4) -> T ([*,] 4, 4)
+    temp = torch.zeros_like(torch.empty(transform.shape[0], 4, 4)).to(a.device)
     temp[:, :3, :4] = transform
     temp[:, 3, 3] = 1
     transform = temp
@@ -146,7 +176,9 @@ class SVDHead(nn.Module):
 
 
 if __name__ == '__main__':
-    p1 = torch.rand((2, 1024, 3)).cuda()
-    p2 = torch.rand((2, 1024, 3)).cuda()
-    weight = torch.rand((2, 1024)).cuda()
-    print(compute_rigid_transform2(p1, p2, weight))
+    for i in range(10):
+        p1 = torch.rand((2, 1024, 3)).cuda()
+        p2 = torch.rand((2, 1024, 3)).cuda()
+        weight = torch.rand((2, 1024)).cuda()
+        print(compute_rigid_transform(p1, p2,weight).sum())
+        print(compute_rigid_transform_rpm(p1,p2,weight).sum())
