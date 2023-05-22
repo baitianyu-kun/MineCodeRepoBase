@@ -8,7 +8,8 @@ import utils.data_utils
 
 
 def show(*inputs, light_mode=False):
-    palette = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1], [1, 1, 0], [1, 0, 1]]
+    palette = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1], [1, 1, 0], [1, 0, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1],
+               [0, 1, 1], [1, 1, 0], [1, 0, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1], [1, 1, 0], [1, 0, 1]]
     # 创建窗口对象
     vis = o3d.visualization.Visualizer()
     # 设置窗口标题
@@ -172,5 +173,5 @@ if __name__ == '__main__':
     #         np.load('../result/best_model_predict/epoch_6/show_p_use_est_g.npy'), )
 
     data = np.loadtxt('../test/data/airplane_0627.txt', delimiter=',')[:1024, 0:3]
-    data_trans=se_math.se3.transform_np(utils.data_utils.random_pose(60, 0.5), data)
-    show_matplot(data,data_trans)
+    data_trans = se_math.se3.transform_np(utils.data_utils.random_pose(60, 0.5), data)
+    show_matplot(data, data_trans)

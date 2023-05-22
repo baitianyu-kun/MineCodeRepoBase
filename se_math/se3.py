@@ -4,20 +4,8 @@ import torch
 from .sinc import sinc1, sinc2, sinc3
 from . import so3
 from scipy.spatial.transform import Rotation
+import math
 
-
-def from_xyzquat(xyzquat):
-    """Constructs SE3 matrix from x, y, z, qx, qy, qz, qw
-    Args:
-        xyzquat: np.array (7,) containing translation and quaterion
-    Returns:
-        SE3 matrix (4, 4)
-    """
-    rot = Rotation.from_quat(xyzquat[3:])
-    trans = rot.apply(-xyzquat[:3])
-    transform = np.concatenate([rot.as_dcm(), trans[:, None]], axis=1)
-    transform = np.concatenate([transform, [[0.0, 0.0, 0.0, 1.0]]], axis=0)
-    return transform
 
 
 def concatenate(a, b, device):

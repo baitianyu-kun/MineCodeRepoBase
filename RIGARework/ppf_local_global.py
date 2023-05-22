@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import utils.train_utils
 from RIGARework.ppfnet_util import sample_and_group_multi
 from RIGARework.ppfnet_util import angle
 
@@ -36,6 +38,7 @@ def get_postpool(in_dim, out_dim):
 
 
 def getLocalPPFFeat(radius, n_sample, xyz, normals):
+    # Use All points to calculate local ppf features
     features = sample_and_group_multi(-1, radius, n_sample, xyz, normals)
     features = features['ppf']
     return features
@@ -74,6 +77,8 @@ class PPFLocalGlobalNet(nn.Module):
         self.postpool_global = get_postpool(emb_dims * 2, emb_dims)
 
     def embeddings(self, features, prepool, postpool):
+        # features: [B, out_dims, neighbors, num_pts]
+        # max pooling on neighbours dims...
         features = prepool(features.permute(0, 3, 2, 1))
         features = torch.max(features, 2)[0]
         features = postpool(features)
@@ -99,8 +104,6 @@ class PPFLocalGlobalNet(nn.Module):
 
 
 if __name__ == '__main__':
-    xyz = torch.rand((2, 1024, 3))
-    normals = torch.rand((2, 1024, 3))
+    xyz = torch.rand((2, 512, 3))
+    normals = torch.rand((2, 512, 3))
     ppf = PPFLocalGlobalNet(emb_dims=96, radius=0.3, num_neighbors=64, use_global=True)
-    print(ppf)
-    ppf(xyz, normals)

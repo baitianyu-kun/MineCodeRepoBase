@@ -4,8 +4,10 @@ Modified from:
 	Pytorch Implementation of PointNet and PointNet++
 	https://github.com/yanx27/Pointnet_Pointnet2_pytorch
 """
-
+import numpy as np
 import torch
+
+import utils.visual
 
 
 def angle_difference(src, dst):
@@ -242,3 +244,32 @@ def sample_and_group_multi(npoint: int, radius: float, nsample: int, xyz: torch.
         return {'xyz': new_xyz, 'dxyz': xyz_feat, 'ppf': ppf_feat}, grouped_xyz, fps_idx
     else:
         return {'xyz': new_xyz, 'dxyz': xyz_feat, 'ppf': ppf_feat}
+
+
+if __name__ == '__main__':
+    data1 = np.loadtxt('../test/data/airplane_0627.txt', delimiter=',')[:1024, :]
+    data2 = np.loadtxt('../test/data/airplane_0010.txt', delimiter=',')[:1024, :]
+    xyz1 = torch.from_numpy(data1[:, 0:3].astype('float32')).unsqueeze(0)
+    xyz2 = torch.from_numpy(data2[:, 0:3].astype('float32')).unsqueeze(0)
+    n1 = torch.from_numpy(data1[:, 3:6].astype('float32')).unsqueeze(0)
+    n2 = torch.from_numpy(data2[:, 3:6].astype('float32')).unsqueeze(0)
+    xyz = torch.cat([xyz1, xyz2])
+    n = torch.cat([n1, n2])
+    fps_idx = farthest_point_sample(xyz, 10)  # [B, npoint, C]
+
+    new_xyz = index_points(xyz, fps_idx)
+    new_n = index_points(n, fps_idx)
+
+    idx = query_ball_point(0.3, 64, xyz, new_xyz, fps_idx)  # (B, npoint, nsample)
+    grouped_xyz = index_points(xyz, idx)  # (B, npoint, nsample, C)
+
+    print(grouped_xyz.shape)
+
+    utils.visual.show(new_xyz[0])
+
+    utils.visual.show(grouped_xyz[0][0], grouped_xyz[0][1], grouped_xyz[0][2], grouped_xyz[0][3],
+                      grouped_xyz[0][4], grouped_xyz[0][5], grouped_xyz[0][6],
+                      grouped_xyz[0][7], grouped_xyz[0][8], grouped_xyz[0][9])
+
+    # utils.visual.show(xyz[0], new_xyz[0], n[0], new_n[0])
+    # utils.visual.show(xyz[1], new_xyz[1], n[1], new_n[1])
