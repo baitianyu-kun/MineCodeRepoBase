@@ -21,8 +21,8 @@ class ThreeDMatch(Dataset):
                  max_angle=45, max_t=0.5,
                  noise=0.0,
                  shuffle_pts=True,
-                 subsampled_rate_src=0.7,
-                 subsampled_rate_tgt=0.7):
+                 subsampled_rate_src=0.8,
+                 subsampled_rate_tgt=0.8):
 
         logger = logging.getLogger()
         logger.info(f'Start loading {partition} data.....')

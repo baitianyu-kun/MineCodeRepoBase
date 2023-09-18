@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from RIGARework.ppf_local_global import PPFLocalGlobalNet
+from CrossAttention import CrossAttention
 
 
 class AttentionBlock(nn.Module):
@@ -55,6 +56,8 @@ class PPFLocalAndGlobal(nn.Module):
     def __init__(self):
         super(PPFLocalAndGlobal, self).__init__()
         self.ppfnet = PPFLocalGlobalNet(emb_dims=96, radius=0.3, num_neighbors=64, use_global=True)
+        self.self_attention = CrossAttention(feature_dim=96, num_heads=1)
+        self.cross_attention = CrossAttention(feature_dim=96, num_heads=1)
 
     def forward(self, ps, pt, ns, nt):
         # [batch, num_pts, in_dims = 96]
@@ -70,4 +73,5 @@ if __name__ == '__main__':
     ns = torch.rand((2, 1024, 3))
     nt = torch.rand((2, 1024, 3))
     model = PPFLocalAndGlobal()
+    print(model)
     model(ps, pt, ns, nt)

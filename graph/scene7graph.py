@@ -63,13 +63,13 @@ def show(points1, points2, points3, light_mode=False):
     vis.destroy_window()
 
 
-files = ['cloud_bin_kitchen.ply','cloud_bin_office.ply','cloud_bin_office2.ply']
+files = ['cloud_bin_33.ply']
 for file in files:
     data = load_data(file)
     transforms_gt = np.load('transforms_igt_matrix.npy')
 
     data = farthest_avg_subsample_points(data, npoint=4096)
     data_gt = se3.transform_np(transforms_gt, data)
-    pose = random_pose(0, 0.04)
+    pose = random_pose(0, 0.02)
     data_trans = se3.transform_np(pose, data)
     show(data, data_gt, data_trans, light_mode=True)

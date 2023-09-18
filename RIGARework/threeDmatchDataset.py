@@ -75,8 +75,8 @@ class ThreeDMatchRIGA(Dataset):
 if __name__ == '__main__':
     pass
 
-    # partial_overlap=0
-    ps, pt, ns, nt, ig, ir, it = ThreeDMatch(DATA_DIR='D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1',
-                                             partition='train',
-                                             partial_overlap=0, num_pts=8000).__getitem__(0)
-    utils.visual.show(ps, pt, ns, nt)
+    # # partial_overlap=0
+    # ps, pt, ns, nt, ig, ir, it = ThreeDMatch(DATA_DIR='D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1',
+    #                                          partition='train',
+    #                                          partial_overlap=0, num_pts=8000).__getitem__(0)
+    # utils.visual.show(ps, pt, ns, nt)

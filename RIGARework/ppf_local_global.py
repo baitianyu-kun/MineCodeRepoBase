@@ -107,3 +107,4 @@ if __name__ == '__main__':
     xyz = torch.rand((2, 512, 3))
     normals = torch.rand((2, 512, 3))
     ppf = PPFLocalGlobalNet(emb_dims=96, radius=0.3, num_neighbors=64, use_global=True)
+    ppf(xyz,normals)

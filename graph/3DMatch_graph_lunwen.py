@@ -78,7 +78,7 @@ def show(points1, points2, points3, light_mode=False):
 
 datas, labels = load_data('D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1')
 transforms_gt = np.load('transforms_igt_matrix.npy')
-for i in range(1,3):
+for i in range(20,30):
     data_o = datas[i]
     data = farthest_avg_subsample_points(data_o, npoint=4096)
     data_gt=se_math.se3.transform_np(transforms_gt,data)

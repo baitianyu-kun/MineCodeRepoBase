@@ -369,3 +369,21 @@ def farthest_avg_subsample_points(point, npoint):
         farthest = np.argmax(distance, -1)
     point = point[centroids.astype(np.int32)]
     return point
+
+
+def non_random_farthest_avg_subsample_points(point, npoint):
+    # farthest = 0 确定起始点为0，这样每次采样的结果都相同
+    N, D = point.shape
+    xyz = point[:, :3]
+    centroids = np.zeros((npoint,))
+    distance = np.ones((N,)) * 1e10
+    farthest = 0
+    for i in range(npoint):
+        centroids[i] = farthest
+        centroid = xyz[farthest, :]
+        dist = np.sum((xyz - centroid) ** 2, -1)
+        mask = dist < distance
+        distance[mask] = dist[mask]
+        farthest = np.argmax(distance, -1)
+    point = point[centroids.astype(np.int32)]
+    return point

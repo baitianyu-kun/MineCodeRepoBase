@@ -57,7 +57,8 @@ def show(points1, points2, points3, light_mode=False):
     vis.destroy_window()
 
 
-files = [ '000178.bin']
+files = ['New Folder/002583.bin','New Folder/002584.bin','New Folder/002585.bin','New Folder/002586.bin'
+         ,'New Folder/002587.bin','New Folder/002588.bin','New Folder/002589.bin']
 for file in files:
     data_o = load_data(file)
 
@@ -65,7 +66,7 @@ for file in files:
 
     data = farthest_avg_subsample_points(data_o, npoint=4096)
     data_gt = se_math.se3.transform_np(transforms_gt, data)
-    pose = random_pose(0, 0.8)
+    pose = random_pose(0, 0.9)
     data_trans = se_math.se3.transform_np(pose, data)
     show(data, data_gt, data_trans, light_mode=True)
 
