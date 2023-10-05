@@ -118,7 +118,7 @@ if __name__ == '__main__':
     DATA_DIR = 'D:\\dataset\\sun3d-home_at-home_at_scan1_2013_jan_1'
     device = 'cuda:0'
 
-    log_save_path = './RIGARework/overlap_log/'
+    log_save_path = '../RIGARework/overlap_log/'
     log_name = 'default_name'
     logger, log_path = utils.logger.prepare_logger(log_save_path, log_name)
     model_save_path = os.path.join(log_path, 'weights_saved')

@@ -34,6 +34,9 @@ def decompose_trans(trans):
     Output
         - R: [3, 3] or [bs, 3, 3], rotation matrix
         - t: [3, 1] or [bs, 3, 1], translation matrix
+    Another version....
+    rotation = transform[..., :3, :3]
+    translation = transform[..., :3, 3]
     """
     if len(trans.shape) == 3:
         return trans[:, :3, :3], trans[:, :3, 3:4]
@@ -234,7 +237,7 @@ def transform_np(g: np.ndarray, pts: np.ndarray):
         g: SE3 transformation matrix of size ([B,] 3/4, 4)
         pts: Points to be transformed ([B,] N, 3)
     Returns:
-        transformed points of size (N, 3)
+        transformed points of size ([B,] N, 3)
     """
     rot = g[..., :3, :3]  # (3, 3)
     trans = g[..., :3, 3]  # (3)

@@ -72,7 +72,7 @@ def showRGB(points1, points2, points3, light_mode=False,window_name='test'):
 #  (np.pi / 6, np.pi / 6, 0)
 #  (0.3, 0.6, 0.4)
 transforms_gt = np.load('transforms_igt_matrix.npy')
-data_path = './dresser_0234.txt'
+data_path = 'dresser_0234.txt'
 data = np.loadtxt(data_path, delimiter=',')[:, 0:3]
 data = utils.data_utils.farthest_avg_subsample_points(data, 1024)
 data_gt = se_math.se3.transform_np(transforms_gt, data)

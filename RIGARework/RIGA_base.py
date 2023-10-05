@@ -63,7 +63,7 @@ class ParameterPredictionNet(nn.Module):
 
 
 def get_graph_feature_with_relative_coor(x, k):
-    """knn-graph.
+    """knn-graph_test.
     Args:
         x: Input point clouds. Size [B, 3, N]
         k: Number of nearest neighbors.

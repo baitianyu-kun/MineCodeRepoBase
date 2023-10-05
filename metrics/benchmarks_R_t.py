@@ -20,7 +20,7 @@ def compute_R_t_metrics(R, t, gtR, gtt):
     cur_r_isotropic = isotropic_R_error(R, inv_R)
     cur_t_isotropic = isotropic_t_error(t, inv_t, inv_R)
     return cur_r_mse, cur_r_mae, cur_t_mse, cur_t_mae, cur_r_isotropic, \
-           cur_t_isotropic
+        cur_t_isotropic
 
 
 def summary_R_t_metrics(r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic):
@@ -33,7 +33,7 @@ def summary_R_t_metrics(r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic):
 
     r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic = \
         np.sqrt(np.mean(r_mse)), np.mean(r_mae), np.sqrt(np.mean(t_mse)), \
-        np.mean(t_mae), np.mean(r_isotropic), np.mean(t_isotropic)
+            np.mean(t_mae), np.mean(r_isotropic), np.mean(t_isotropic)
     return r_mse, r_mae, t_mse, t_mae, r_isotropic, t_isotropic
 
 

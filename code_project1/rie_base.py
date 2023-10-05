@@ -10,7 +10,7 @@ _EPS = 1e-5
 
 def get_graph_feature_with_relative_coor(x, k):
     """
-        knn-graph.
+        knn-graph_test.
         Args:
             x: Input point clouds. Size [B, 3, N]
             k: Number of nearest neighbors.
@@ -38,7 +38,7 @@ def get_graph_feature_with_relative_coor(x, k):
 
 
 def get_knn_index(x, k):
-    """ knn-graph.
+    """ knn-graph_test.
     Args:
         x: Input point clouds. Size [B, 3, N]
         k: Number of nearest neighbors.
